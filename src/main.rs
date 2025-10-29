@@ -55,17 +55,22 @@ fn main() -> ocl::Result<()> {
     println!("Calibration Event Start: {}", calibration_start);
     println!("Calibration Event End:   {}", calibration_end);
 
-    //let zone = span!("OCL");
-    let mut zone = gpu_context.span_alloc("OCL Dummy","main","main.rs",35).unwrap();
-    //zone.emit_color(0xFF0000);
-
     let kernel = pro_que.kernel_builder("add")
         .arg(&buffer)
         .arg(10.0f32)
         .build()?;
+    //let zone = span!("OCL");
+    let mut zone = gpu_context.span_alloc("OCL Dummy","main","main.rs",35).unwrap();
+    //zone.emit_color(0xFF0000);
+
 
     let mut event = ocl::Event::empty();
+
+
+    {
+    let _cpu_wait_zone = span!("clEnqueue");
     unsafe { kernel.cmd().enew(&mut event).enq()? };
+    }
 
     {
     let _cpu_wait_zone = span!("clWaitForEvents");
@@ -73,6 +78,8 @@ fn main() -> ocl::Result<()> {
     }
 
     zone.end_zone();
+    let mut vec = vec![0.0f32; buffer.len()];
+    buffer.read(&mut vec).enq()?;
     
     let start_time = get_start_time(&event)?;
     println!("Start time: {}", start_time);
@@ -82,8 +89,6 @@ fn main() -> ocl::Result<()> {
     zone.upload_timestamp_end(end_time);
 
 
-    let mut vec = vec![0.0f32; buffer.len()];
-    buffer.read(&mut vec).enq()?;
 
     println!("The value at index [{}] is now '{}'!", 200007, vec[200007]);
     Ok(())
